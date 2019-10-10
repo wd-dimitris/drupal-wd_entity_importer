@@ -1,0 +1,5 @@
+name: 'WD Entity Importer'
+type: module
+description: 'Import Entities from csv'
+core: 8.x
+package: 'Custom'

@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Contains wd_entity_importer.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function wd_entity_importer_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the wd_entity_importer module.
+    case 'help.page.wd_entity_importer':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Import Entities from csv') . '</p>';
+      return $output;
+
+    default:
+  }
+}

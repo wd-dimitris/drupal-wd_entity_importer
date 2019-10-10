@@ -1,0 +1,7 @@
+wd_entity_importer.importer_form:
+  path: '/wd_entity_importer/form/importer'
+  defaults:
+    _form: '\Drupal\wd_entity_importer\Form\ImporterForm'
+    _title: 'ImporterForm'
+  requirements:
+    _permission: 'wd import'
