@@ -35,10 +35,13 @@ Currently it's a custom module, not available in a repository.
 
 No configuration is needed.
 
+**Menu Link:** `Configuration/Development/WD Import Entities`  
+**Path:** `/wd_entity_importer/form/importer`
+
 ## CSV Settings:
 * Character encoding: UTF-8
-* Separator: ,
-* String delimiter: "
+* Separator: `,`
+* String delimiter: `"`
 
 ## CSV Content
 
