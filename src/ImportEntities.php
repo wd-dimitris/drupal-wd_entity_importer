@@ -186,6 +186,7 @@ class ImportEntities{
                                 $node->set($fieldName, $fieldData['value']);
                                 break;
                             case 'media_image':
+                                // WD-TODO: catch file not existing exceptions ans stuff
                                 $uri = \Drupal::service('file_system')->copy('public://wd_entity_importer/images/'.$fieldData['value'], 'public://workservices/'.$fieldData['value']);
                                 $file = \Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
                                 $file->save();
