@@ -1,0 +1,6 @@
+wd_entity_importer.import:
+  title: 'WD Import Entities'
+  route_name: wd_entity_importer.importer_form
+  description: 'A description for the menu entry'
+  parent: system.admin_config_development
+  weight: 99
