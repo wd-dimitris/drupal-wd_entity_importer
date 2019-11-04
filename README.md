@@ -12,7 +12,7 @@
 
 With WD Entity Importer, users can create or update entities from csv files. 
 
-Currently the module provides only node creation.
+Currently the module provides only entity creation.
 
 
 # REQUIREMENTS
@@ -22,13 +22,13 @@ No special requirements.
 
 # RECOMMENDED MODULES
 
-For now, no recommended modules.
+No recommended modules.
 
 # INSTALLATION
 
 Currently it's a custom module, not available in a repository.
 
-[GitHub project](https://github.com/wd-dimitris/drupal-wd_entity_importer)
+[Project on GitHub](https://github.com/wd-dimitris/drupal-wd_entity_importer)
 
 
 # CONFIGURATION

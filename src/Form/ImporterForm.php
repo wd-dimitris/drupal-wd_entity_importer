@@ -2,6 +2,7 @@
 
 namespace Drupal\wd_entity_importer\Form;
 
+use Drupal\Core\Entity\ContentEntityType;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 
@@ -26,17 +27,56 @@ class ImporterForm extends FormBase {
             'file_validate_extensions' => ['csv'],
         ];
 
+        $contentEntityTypes = [];
+        $contentEntityTypesOptions = [];
+        $contentEntityBundlesOptions = [];
+        $entityTypeDefinitions = \Drupal::entityTypeManager()->getDefinitions();
+        foreach ($entityTypeDefinitions as $key => $definition) {
+            if ($definition instanceof ContentEntityType) {
+                $contentEntityTypes[$key] = $definition;
+                $contentEntityTypesOptions[$key] = $definition->getLabel()->getUntranslatedString();
+                $contentEntityBundlesOptions[$key] = [];
+                $bundles = \Drupal::service('entity_type.bundle.info')->getBundleInfo($key);
+                foreach($bundles as $bundleKey => $bundle){
+                    $contentEntityBundlesOptions[$key][$bundleKey] = $bundle['label'];
+                }
+            }
+        }
+
+        $form['entity_type'] = [
+            '#type' => 'select',
+            '#title' => $this->t('Entity Type'),
+            '#options' => $contentEntityTypesOptions,
+            '#required' => TRUE,
+            '#ajax' => [
+                'callback' => '::entityTypeCallback',
+                'event' => 'change',
+                'wrapper' => 'entity-type-wrapper',
+            ],
+        ];
+
+        $form['entity_type_wrapper'] = [
+            '#type' => 'container',
+            '#attributes' => [
+                'id' => 'entity-type-wrapper',
+            ],
+        ];
+
+        $entityTYpe = $form_state->getValue('entity_type');
+        if(isset($entityTYpe)){
+            $form['entity_type_wrapper']['entity_bundle'] = [
+                '#type' => 'select',
+                '#title' => $this->t('Entity Bundle'),
+                '#options' => $contentEntityBundlesOptions[$entityTYpe],
+                '#required' => TRUE,
+            ];
+        }
+
         $types = \Drupal::entityTypeManager()->getStorage('node_type')->loadMultiple();
         $options = [];
         foreach($types as $type){
             $options[$type->id()] = $type->label();
         }
-        $form['node_type'] = [
-            '#type' => 'select',
-            '#title' => $this->t('Node Type'),
-            '#options' => $options,
-            '#required' => TRUE,
-        ];
 
         $form['csv'] = [
             '#type' => 'managed_file',
@@ -67,14 +107,15 @@ class ImporterForm extends FormBase {
      * {@inheritdoc}
      */
     public function submitForm(array &$form, FormStateInterface $form_state) {
-        $nodeType = $form_state->getValue('node_type');
+        $entityType = $form_state->getValue('entity_type');
+        $entityBundle = $form_state->getValue('entity_bundle');
         $file = $form_state->getValue('csv');
         $csv = \Drupal::entityTypeManager()->getStorage('file')->load($file[0]);
         $csv_uri = $csv->getFileUri();
 
         $batch = [
             'operations' => [
-                ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $nodeType]]
+                ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $entityType, $entityBundle]]
             ],
             'finished' => '\Drupal\wd_entity_importer\ImportEntities::importFinish',
             'title' => $this->t('Importing nodes...'),
@@ -84,6 +125,10 @@ class ImporterForm extends FormBase {
             'error_message' => $this->t('An error was encountered processing the csv file.'),
         ];
         batch_set($batch);
+    }
+
+    public function entityTypeCallback(array $form, FormStateInterface $form_state) {
+        return $form['entity_type_wrapper'];
     }
 
 }

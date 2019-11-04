@@ -7,9 +7,7 @@ use Drupal\node\Entity\Node;
 
 class ImportEntities{
 
-    // WD-TODO: Based on field definitions prepare an array for each row and then create node and translations with the values array accordingly
-
-    public function import($csv_uri, $nodeType, &$context){
+    public function import($csv_uri, $entityType, $entityBundle, &$context){
 
         $user = \Drupal::currentUser();
         $uid = $user->id();
@@ -66,9 +64,9 @@ class ImportEntities{
                 // Create first node for default language
                 /** @var Node $node */
                 $node = \Drupal::entityTypeManager()
-                    ->getStorage('node')
+                    ->getStorage($entityType)
                     ->create([
-                        'type' => $nodeType,
+                        'type' => $entityBundle,
                         'langcode' => $defaultLanguage,
                         'uid' => $uid,
                         'created' => \Drupal::time()->getRequestTime(),
@@ -180,6 +178,7 @@ class ImportEntities{
 
                 // Set row data to node
                 foreach($fields as $fieldName => $fieldData){
+                    $fieldData['value'] = trim($fieldData['value']);
                     if($node->hasField($fieldName)){
                         switch($fieldData['type']){
                             case 'string':
