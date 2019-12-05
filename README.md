@@ -74,12 +74,21 @@ At the moment the module supports string fields, media image fields and taxonomy
 
 ### Text (formatted) field, e.g. body
 
-`Header:` text_formatted|format|field_name
+`Header:` text_formatted|format|field_name  
 `Value:` field value
 
-|text_formatted&#124;full_html&#124;field_my_image|
+|text_formatted&#124;full_html&#124;body|
 |---|
 |body content, possibly including html|
+
+### Date field
+
+`Header:` date|filed_name  
+`Value:` YYYY-MM-DD
+
+|date&#124;field_my_date|
+|---|
+|2019-12-04|
 
 ### Media Image Field
 

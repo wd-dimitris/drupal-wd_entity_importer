@@ -79,7 +79,7 @@ class ImportEntities{
                         //$isTranslatable = $entity->get($field)->getFieldDefinition()->isTranslatable();
 
                         // Regular field
-                        if (!strpos($field, '|')) {
+                        if (!strpos($field, '|')) { // ['field_name']
                             $fields[$field]['name'] = $field;
                             $fields[$field]['type'] = 'string';
                             $fields[$field]['value'] = '';
