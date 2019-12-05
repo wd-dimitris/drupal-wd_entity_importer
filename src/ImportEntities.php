@@ -3,7 +3,6 @@
 namespace Drupal\wd_entity_importer;
 
 use Drupal\media\Entity\Media;
-use Drupal\node\Entity\Node;
 
 class ImportEntities{
 
@@ -61,9 +60,8 @@ class ImportEntities{
                 $context['sandbox']['records'];
                 // Do something with the data
 
-                // Create first node for default language
-                /** @var Node $node */
-                $node = \Drupal::entityTypeManager()
+                // Create first entity for default language
+                $entity = \Drupal::entityTypeManager()
                     ->getStorage($entityType)
                     ->create([
                         'type' => $entityBundle,
@@ -76,9 +74,9 @@ class ImportEntities{
                 // Get first row field info
                 if($firstRow){
                     foreach($data as $key => $field) {
-                        // $fieldType = $node->get($field)->getFieldDefinition()->getType();
+                        // $fieldType = $entity->get($field)->getFieldDefinition()->getType();
                         // WD-TODO: check if field is translatable
-                        //$isTranslatable = $node->get($field)->getFieldDefinition()->isTranslatable();
+                        //$isTranslatable = $entity->get($field)->getFieldDefinition()->isTranslatable();
 
                         // Regular field
                         if (!strpos($field, '|')) {
@@ -176,13 +174,13 @@ class ImportEntities{
                     }
                 }
 
-                // Set row data to node
+                // Set row data to entity
                 foreach($fields as $fieldName => $fieldData){
                     $fieldData['value'] = trim($fieldData['value']);
-                    if($node->hasField($fieldName)){
+                    if($entity->hasField($fieldName)){
                         switch($fieldData['type']){
                             case 'string':
-                                $node->set($fieldName, $fieldData['value']);
+                                $entity->set($fieldName, $fieldData['value']);
                                 break;
                             case 'media_image':
                                 // WD-TODO: catch file not existing exceptions ans stuff
@@ -207,7 +205,7 @@ class ImportEntities{
                                     ]);
                                 $mediaImage->setName($fieldData['value']);
                                 $mediaImage->save();
-                                $node->set($fieldName, ['target_id' => $mediaImage->id()]);
+                                $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
                                 break;
                             case 'taxonomy_term':
                                 // Get term by name, given the vid
@@ -217,13 +215,13 @@ class ImportEntities{
                                 ]);
                                 $term = reset($terms);
                                 if($term){
-                                    $node->set($fieldName, ['target_id' => $term->id()]);
+                                    $entity->set($fieldName, ['target_id' => $term->id()]);
                                 }
                                 break;
                         }
                     }
                 }
-                $node->save();
+                $entity->save();
                 // Check for translations
                 if(count($languages) > 1){
                     $skipDefaultLanguage = TRUE;
@@ -232,14 +230,14 @@ class ImportEntities{
                             $skipDefaultLanguage = FALSE;
                             continue;
                         }
-                        $node->addTranslation($lang, $node->toArray());
-                        $node->save();
-                        $translatedNode = $node->getTranslation($lang);
+                        $entity->addTranslation($lang, $entity->toArray());
+                        $entity->save();
+                        $translatedEntity = $entity->getTranslation($lang);
                         foreach($fields as $fname => $d){
                             if(isset($d['translation'])){
                                 switch($d['type']){
                                     case 'string':
-                                        $translatedNode->set($fname, $d['translation'][$lang]['value']);
+                                        $translatedEntity->set($fname, $d['translation'][$lang]['value']);
                                         break;
                                     case 'media_image':
                                         $mediaImageValues = $mediaImage->toArray();
@@ -250,7 +248,7 @@ class ImportEntities{
                                 }
                             }
                         }
-                        $translatedNode->save();
+                        $translatedEntity->save();
                     }
                 }
             }
