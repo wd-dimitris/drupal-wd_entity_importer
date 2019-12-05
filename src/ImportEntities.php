@@ -90,6 +90,13 @@ class ImportEntities{
                             $fieldList = explode('|', $field);
                             $fieldListCount = count($fieldList);
                             switch ($fieldList[0]) {
+                                case 'text_formatted': // ['text_formatted', 'full_html', 'body']
+                                    $fields[$fieldList[2]]['name'] = $fieldList[2];
+                                    $fields[$fieldList[2]]['type'] = 'text_formatted';
+                                    $fieldsMap[$key]['field'] = $fieldList[2];
+                                    $fieldsMap[$key]['type'] = 'text_formatted';
+                                    $fieldsMap[$key]['format'] = $fieldList[1];
+                                    break;
                                 // WD-TODO: support all media types
                                 // WD-TODO: support custom media image field
                                 // WD-TODO: support multi value media field
@@ -154,6 +161,10 @@ class ImportEntities{
                         case 'string':
                             $fields[$fieldName]['value'] = $fieldData;
                             break;
+                        case 'text_formatted':
+                            $fields[$fieldName]['value'] = $fieldData;
+                            $fields[$fieldName]['format'] = $fieldsMap[$key]['format'];
+                            break;
                         case 'media_image_uri':
                             $fields[$fieldName]['value'] = $fieldData;
                             break;
@@ -176,17 +187,22 @@ class ImportEntities{
 
                 // Set row data to entity
                 foreach($fields as $fieldName => $fieldData){
-                    $fieldData['value'] = trim($fieldData['value']);
+                    $fieldValue = trim($fieldData['value']);
+                    $fieldType = $fieldData['type'];
                     if($entity->hasField($fieldName)){
-                        switch($fieldData['type']){
+                        switch($fieldType){
                             case 'string':
-                                $entity->set($fieldName, $fieldData['value']);
+                                $entity->set($fieldName, $fieldValue);
+                                break;
+                            case 'text_formatted':
+                                $entity->set($fieldName,['value' => $fieldValue, 'format' => $fieldData['format']]);
                                 break;
                             case 'media_image':
                                 // WD-TODO: catch file not existing exceptions ans stuff
                                 $uri = \Drupal::service('file_system')->copy('public://wd_entity_importer/images/'.$fieldData['value'], 'public://workservices/'.$fieldData['value']);
                                 $file = \Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
                                 $file->save();
+                                $mediaImageAlt = trim($fieldData['alt']['value']);
                                 /** @var Media $mediaImage */
                                 $mediaImage = \Drupal::entityTypeManager()
                                     ->getStorage('media')
@@ -196,22 +212,22 @@ class ImportEntities{
                                         'langcode' => $defaultLanguage,
                                         'field_media_image' => [
                                             'target_id' => $file->id(),
-                                            'alt' => $fieldData['alt']['value'],
+                                            'alt' => $mediaImageAlt,
                                         ],
                                         'thumbnail' => [
                                             'target_id' => $file->id(),
-                                            'alt' => $fieldData['alt']['value'],
+                                            'alt' => $mediaImageAlt,
                                         ]
                                     ]);
-                                $mediaImage->setName($fieldData['value']);
+                                $mediaImage->setName($fieldValue);
                                 $mediaImage->save();
                                 $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
                                 break;
                             case 'taxonomy_term':
                                 // Get term by name, given the vid
                                 $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
-                                    'vid' => $fieldData['vid'],
-                                    'name' => $fieldData['value'],
+                                    'vid' => trim($fieldData['vid']),
+                                    'name' => $fieldValue,
                                 ]);
                                 $term = reset($terms);
                                 if($term){
@@ -235,13 +251,15 @@ class ImportEntities{
                         $translatedEntity = $entity->getTranslation($lang);
                         foreach($fields as $fname => $d){
                             if(isset($d['translation'])){
+                                $translatedValue = $d['translation'][$lang]['value'];
                                 switch($d['type']){
                                     case 'string':
-                                        $translatedEntity->set($fname, $d['translation'][$lang]['value']);
+                                        $translatedEntity->set($fname, $translatedValue);
                                         break;
                                     case 'media_image':
+                                        $translatedMediaImageAlt = trim($d['translation'][$lang]['alt']['value']);
                                         $mediaImageValues = $mediaImage->toArray();
-                                        $mediaImageValues['field_media_image'][0]['alt'] = $d['translation'][$lang]['alt']['value'];
+                                        $mediaImageValues['field_media_image'][0]['alt'] = $translatedMediaImageAlt;
                                         $mediaImage->addTranslation('el', $mediaImageValues);
                                         $mediaImage->save();
                                         break;
@@ -268,7 +286,7 @@ class ImportEntities{
         else {
             \Drupal::messenger()->addError('An error occurred and processing did not complete.');
             $count = count($results);
-            $message = "$count items uccessfully processed";
+            $message = "$count items unsuccessfully processed";
             \Drupal::messenger()->addMessage($message);
         }
     }

@@ -48,6 +48,7 @@ class ImporterForm extends FormBase {
             '#title' => $this->t('Entity Type'),
             '#options' => $contentEntityTypesOptions,
             '#required' => TRUE,
+            '#default_value' => 'node',
             '#ajax' => [
                 'callback' => '::entityTypeCallback',
                 'event' => 'change',
@@ -62,21 +63,20 @@ class ImporterForm extends FormBase {
             ],
         ];
 
-        $entityTYpe = $form_state->getValue('entity_type');
-        if(isset($entityTYpe)){
-            $form['entity_type_wrapper']['entity_bundle'] = [
-                '#type' => 'select',
-                '#title' => $this->t('Entity Bundle'),
-                '#options' => $contentEntityBundlesOptions[$entityTYpe],
-                '#required' => TRUE,
-            ];
+        $bundleOptions = [];
+        $entityType = $form_state->getValue('entity_type');
+        if(empty($entityType)){
+            $bundleOptions = $contentEntityBundlesOptions['node'];
         }
-
-        $types = \Drupal::entityTypeManager()->getStorage('node_type')->loadMultiple();
-        $options = [];
-        foreach($types as $type){
-            $options[$type->id()] = $type->label();
+        else{
+            $bundleOptions = $contentEntityBundlesOptions[$entityType];
         }
+        $form['entity_type_wrapper']['entity_bundle'] = [
+            '#type' => 'select',
+            '#title' => $this->t('Entity Bundle'),
+            '#options' => $bundleOptions,
+            '#required' => TRUE,
+        ];
 
         $form['csv'] = [
             '#type' => 'managed_file',
@@ -107,24 +107,30 @@ class ImporterForm extends FormBase {
      * {@inheritdoc}
      */
     public function submitForm(array &$form, FormStateInterface $form_state) {
-        $entityType = $form_state->getValue('entity_type');
-        $entityBundle = $form_state->getValue('entity_bundle');
-        $file = $form_state->getValue('csv');
-        $csv = \Drupal::entityTypeManager()->getStorage('file')->load($file[0]);
-        $csv_uri = $csv->getFileUri();
+        $trigger = (string) $form_state->getTriggeringElement()['#value'];
+        switch ($trigger) {
+            case 'Submit':
+                $entityType = $form_state->getValue('entity_type');
+                $entityBundle = $form_state->getValue('entity_bundle');
+                $file = $form_state->getValue('csv');
+                $csv = \Drupal::entityTypeManager()->getStorage('file')->load($file[0]);
+                $csv_uri = $csv->getFileUri();
 
-        $batch = [
-            'operations' => [
-                ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $entityType, $entityBundle]]
-            ],
-            'finished' => '\Drupal\wd_entity_importer\ImportEntities::importFinish',
-            'title' => $this->t('Importing nodes...'),
-            // We use a single multi-pass operation, so the default
-            // 'Remaining x of y operations' message will be confusing here.
-            'progress_message' => '',
-            'error_message' => $this->t('An error was encountered processing the csv file.'),
-        ];
-        batch_set($batch);
+                $batch = [
+                    'operations' => [
+                        ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $entityType, $entityBundle]]
+                    ],
+                    'finished' => '\Drupal\wd_entity_importer\ImportEntities::importFinish',
+                    'title' => $this->t('Importing nodes...'),
+                    // We use a single multi-pass operation, so the default
+                    // 'Remaining x of y operations' message will be confusing here.
+                    'progress_message' => '',
+                    'error_message' => $this->t('An error was encountered processing the csv file.'),
+                ];
+                batch_set($batch);
+                return;
+        }
+        $form_state->setRebuild();
     }
 
     public function entityTypeCallback(array $form, FormStateInterface $form_state) {

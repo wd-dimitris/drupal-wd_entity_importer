@@ -72,6 +72,15 @@ At the moment the module supports string fields, media image fields and taxonomy
 |--- | ---|
 |νοδε1 | νοδε1 περιγραφή|
 
+### Text (formatted) field, e.g. body
+
+`Header:` text_formatted|format|field_name
+`Value:` field value
+
+|text_formatted&#124;full_html&#124;field_my_image|
+|---|
+|body content, possibly including html|
+
 ### Media Image Field
 
 Upload all images to `/sites/default/files/wd_entity_importer/images` before import.
