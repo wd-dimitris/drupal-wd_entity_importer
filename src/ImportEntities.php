@@ -124,6 +124,13 @@ class ImportEntities{
                                     $fieldsMap[$key]['field'] = $fieldList[2];
                                     $fieldsMap[$key]['type'] = 'taxonomy_term';
                                     break;
+                                case 'term_auto': // ['term_auto', 'vocabulary id', 'field_name']
+                                    $fields[$fieldList[2]]['vid'] = $fieldList[1];
+                                    $fields[$fieldList[2]]['type'] = 'taxonomy_term_auto_create';
+                                    $fields[$fieldList[2]]['value'] = '';
+                                    $fieldsMap[$key]['field'] = $fieldList[2];
+                                    $fieldsMap[$key]['type'] = 'taxonomy_term_auto_create';
+                                    break;
                                 case 'translation':
                                     // Regular field
                                     if ($fieldListCount == 3) { // ['translation', 'el', 'field_name']
@@ -172,6 +179,9 @@ class ImportEntities{
                             $fields[$fieldName]['alt']['value'] = $fieldData;
                             break;
                         case 'taxonomy_term':
+                            $fields[$fieldName]['value'] = $fieldData;
+                            break;
+                        case 'taxonomy_term_auto_create':
                             $fields[$fieldName]['value'] = $fieldData;
                             break;
                         case 'translation_string':
@@ -234,6 +244,27 @@ class ImportEntities{
                                     $entity->set($fieldName, ['target_id' => $term->id()]);
                                 }
                                 break;
+                            case 'taxonomy_term_auto_create':
+                                // Get term by name, given the vid
+                                $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
+                                    'vid' => trim($fieldData['vid']),
+                                    'name' => $fieldValue,
+                                ]);
+                                $term = reset($terms);
+                                if($term){
+                                    $entity->set($fieldName, ['target_id' => $term->id()]);
+                                }
+                                else{ // if the term does not exist, create it
+                                    $termEntity = \Drupal::entityTypeManager()
+                                        ->getStorage('taxonomy_term')
+                                        ->create([
+                                            'name' => $fieldValue,
+                                            'vid' => trim($fieldData['vid']),
+                                        ]);
+                                    $termEntity->save();
+                                    $entity->set($fieldName, ['target_id' => $termEntity->id()]);
+                                }
+
                         }
                     }
                 }

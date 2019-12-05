@@ -134,6 +134,15 @@ If the vocabulary is translated, for the value put the term name of the original
 |---|
 |category1|
 
+### Taxonomy Term Auto Create
+
+`Header:` term_auto|vocabulary_machine_name|field_name  
+`Value:` term name
+
+|term_auto&#124;tags&#124;field_tags|
+|---|
+|tag1|
+
 
 # MAINTAINERS
 
