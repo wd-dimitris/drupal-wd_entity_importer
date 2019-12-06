@@ -198,11 +198,21 @@ class ImportEntities{
                 // Set row data to entity
                 foreach($fields as $fieldName => $fieldData){
                     $fieldValue = trim($fieldData['value']);
+                    $fieldValues = explode(',', $fieldValue);
+                    $isMultiValue = count($fieldValues > 1);
                     $fieldType = $fieldData['type'];
                     if($entity->hasField($fieldName)){
                         switch($fieldType){
                             case 'string':
-                                $entity->set($fieldName, $fieldValue);
+                                if($isMultiValue){
+                                    // WD-TODO: check if drupal field is multivalued
+                                    foreach($fieldValues as $v){
+                                        $entity->$fieldName[] = $v;
+                                    }
+                                }
+                                else {
+                                    $entity->set($fieldName, $fieldValue);
+                                }
                                 break;
                             case 'text_formatted':
                                 $entity->set($fieldName,['value' => $fieldValue, 'format' => $fieldData['format']]);
@@ -234,36 +244,57 @@ class ImportEntities{
                                 $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
                                 break;
                             case 'taxonomy_term':
-                                // Get term by name, given the vid
-                                $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
-                                    'vid' => trim($fieldData['vid']),
-                                    'name' => $fieldValue,
-                                ]);
-                                $term = reset($terms);
-                                if($term){
-                                    $entity->set($fieldName, ['target_id' => $term->id()]);
+                                foreach($fieldValues as $v){
+                                    // Get term by name, given the vid
+                                    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
+                                        'vid' => trim($fieldData['vid']),
+                                        'name' => $v,
+                                    ]);
+                                    $term = reset($terms);
+                                    if($term){
+                                        if($isMultiValue){
+                                            $entity->$fieldName[] = ['target_id' => $term->id()];
+                                        }
+                                        else{
+                                            $entity->set($fieldName, ['target_id' => $term->id()]);
+                                        }
+                                    }
                                 }
                                 break;
                             case 'taxonomy_term_auto_create':
-                                // Get term by name, given the vid
-                                $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
-                                    'vid' => trim($fieldData['vid']),
-                                    'name' => $fieldValue,
-                                ]);
-                                $term = reset($terms);
-                                if($term){
-                                    $entity->set($fieldName, ['target_id' => $term->id()]);
+                                foreach($fieldValues as $v){
+                                    // Get term by name, given the vid
+                                    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
+                                        'vid' => trim($fieldData['vid']),
+                                        'name' => $v,
+                                    ]);
+                                    $term = reset($terms);
+                                    if($term) {
+                                        if($isMultiValue){
+                                            $entity->$fieldName[] = ['target_id' => $term->id()];
+                                        }
+                                        else{
+                                            $entity->set($fieldName, ['target_id' => $term->id()]);
+                                        }
+                                    }
+                                    else{ // if the term does not exist, create it
+                                        $termEntity = \Drupal::entityTypeManager()
+                                            ->getStorage('taxonomy_term')
+                                            ->create([
+                                                'name' => $v,
+                                                'vid' => trim($fieldData['vid']),
+                                            ]);
+                                        $termEntity->save();
+                                        if($isMultiValue){
+                                            $entity->$fieldName[] = ['target_id' => $termEntity->id()];
+                                        }
+                                        else{
+                                            $entity->set($fieldName, ['target_id' => $termEntity->id()]);
+                                        }
+                                    }
+
                                 }
-                                else{ // if the term does not exist, create it
-                                    $termEntity = \Drupal::entityTypeManager()
-                                        ->getStorage('taxonomy_term')
-                                        ->create([
-                                            'name' => $fieldValue,
-                                            'vid' => trim($fieldData['vid']),
-                                        ]);
-                                    $termEntity->save();
-                                    $entity->set($fieldName, ['target_id' => $termEntity->id()]);
-                                }
+                                break;
 
                         }
                     }
