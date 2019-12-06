@@ -26,7 +26,7 @@ No recommended modules.
 
 # INSTALLATION
 
-Currently it's a custom module, not available in a repository.
+Currently it's a custom module, not available in drupal repositories.
 
 [Project on GitHub](https://github.com/wd-dimitris/drupal-wd_entity_importer)
 
@@ -42,6 +42,7 @@ No configuration is needed.
 * Character encoding: UTF-8
 * Separator: `,`
 * String delimiter: `"`
+* Multi value separator: `,`
 
 ## CSV Content
 
@@ -50,7 +51,15 @@ and possibly other configuration info.
 
 Each following row will consist of the corresponding field's value.
 
-At the moment the module supports string fields, media image fields and taxonomy term fields. It also supports the translation of these fields 
+At the moment the module supports the following types of fields:  
+
+|type | translation | multi value|
+| --- | --- | --- |
+| plain text / string | yes | yes|
+| text formatted (body) | yes | no|
+| date (datetime coming soon) | yes | no|
+| media image | yes | no|
+| taxonomy term | yes | yes|
 
 ## CSV fields examples
 
@@ -59,9 +68,9 @@ At the moment the module supports string fields, media image fields and taxonomy
 `Header:` field_name  
 `Value:` field value
 
-|title | field_description|
-|--- | ---|
-|node1 | node1 description|
+|title | field_description| field_fruits |
+|--- | --- | --- |
+|node1 | node1 description| apple,orange,banana |
 
 ### String field Translation
 
