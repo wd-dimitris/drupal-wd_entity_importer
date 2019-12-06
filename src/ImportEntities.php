@@ -47,7 +47,7 @@ class ImportEntities{
         $fields = [];
         $fieldsMap = [];
         for ( $i = 0; $i < $limit; $i++ ) {
-            $data = fgetcsv($file_handle, 1000, ",");
+            $data = fgetcsv($file_handle, 10000, ",");
 
             if ( $data === FALSE ) {
                 $done = TRUE;
@@ -204,22 +204,15 @@ class ImportEntities{
                     if($entity->hasField($fieldName)){
                         switch($fieldType){
                             case 'string':
-                                if($isMultiValue){
-                                    // WD-TODO: check if drupal field is multivalued
-                                    foreach($fieldValues as $v){
-                                        $entity->$fieldName[] = $v;
-                                    }
-                                }
-                                else {
-                                    $entity->set($fieldName, $fieldValue);
-                                }
+                                $entity->set($fieldName, $fieldValue);
                                 break;
                             case 'text_formatted':
                                 $entity->set($fieldName,['value' => $fieldValue, 'format' => $fieldData['format']]);
                                 break;
                             case 'media_image':
                                 // WD-TODO: catch file not existing exceptions ans stuff
-                                $uri = \Drupal::service('file_system')->copy('public://wd_entity_importer/images/'.$fieldData['value'], 'public://workservices/'.$fieldData['value']);
+                                // WD-TODO: destination is hardcoded, the module does not create directories
+                                $uri = \Drupal::service('file_system')->copy('public://wd_entity_importer/images/'.$fieldData['value'], 'public://uploads/'.$fieldData['value']);
                                 $file = \Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
                                 $file->save();
                                 $mediaImageAlt = trim($fieldData['alt']['value']);

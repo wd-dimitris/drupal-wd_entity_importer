@@ -55,7 +55,7 @@ At the moment the module supports the following types of fields:
 
 |type | translation | multi value|
 | --- | --- | --- |
-| plain text / string | yes | yes|
+| plain text / string | yes | no|
 | text formatted (body) | yes | no|
 | date (datetime coming soon) | yes | no|
 | media image | yes | no|
