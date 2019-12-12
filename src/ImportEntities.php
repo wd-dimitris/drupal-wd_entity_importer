@@ -205,7 +205,7 @@ class ImportEntities{
                 // Set row data to entity
                 foreach($fields as $fieldName => $fieldData){
                     $fieldValue = trim($fieldData['value']);
-                    $fieldValues = explode(',', $fieldValue);
+                    $fieldValues = explode('|', $fieldValue);
                     $isMultiValue = is_array($fieldValues);
                     $fieldType = $fieldData['type'];
                     if($entity->hasField($fieldName)){

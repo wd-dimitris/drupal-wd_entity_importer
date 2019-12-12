@@ -42,7 +42,7 @@ No configuration is needed.
 * Character encoding: UTF-8
 * Separator: `,`
 * String delimiter: `"`
-* Multi value separator: `,`
+* Multi value separator: `|`
 
 ## CSV Content
 
