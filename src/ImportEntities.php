@@ -6,7 +6,10 @@ use Drupal\media\Entity\Media;
 
 class ImportEntities{
 
-    public function import($csv_uri, $entityType, $entityBundle, &$context){
+    public function __construct(){
+    }
+
+    public static function import($csv_uri, $entityType, $entityBundle, &$context){
 
         $user = \Drupal::currentUser();
         $uid = $user->id();
@@ -199,7 +202,7 @@ class ImportEntities{
                 foreach($fields as $fieldName => $fieldData){
                     $fieldValue = trim($fieldData['value']);
                     $fieldValues = explode(',', $fieldValue);
-                    $isMultiValue = count($fieldValues > 1);
+                    $isMultiValue = is_array($fieldValues);
                     $fieldType = $fieldData['type'];
                     if($entity->hasField($fieldName)){
                         switch($fieldType){
@@ -334,7 +337,7 @@ class ImportEntities{
         $context['finished'] = ( $eof || $done ) ? TRUE : FALSE;
     }
 
-    public function importFinish($success, $results, $operations){
+    public static function importFinish($success, $results, $operations){
         if ($success) {
             \Drupal::messenger()->addMessage('Import completed.');
         }

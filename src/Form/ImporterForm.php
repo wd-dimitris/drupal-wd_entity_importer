@@ -63,7 +63,6 @@ class ImporterForm extends FormBase {
             ],
         ];
 
-        $bundleOptions = [];
         $entityType = $form_state->getValue('entity_type');
         if(empty($entityType)){
             $bundleOptions = $contentEntityBundlesOptions['node'];
