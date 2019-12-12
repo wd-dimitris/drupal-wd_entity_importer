@@ -87,9 +87,21 @@ class ImporterForm extends FormBase {
             '#required' => TRUE,
         ];
 
+        $form['source_path'] = [
+            '#type' => 'textfield',
+            '#title' => t('Files source path'),
+            '#description' => t('Path relative to drupal public://, e.g. uploads/images'),
+        ];
+
+        $form['destination_path'] = [
+            '#type' => 'textfield',
+            '#title' => t('Files destination path'),
+            '#description' => t('Path relative to drupal public://, e.g. article/images, default=[date:custom:Y]-[date:custom:m]-imported'),
+        ];
+
         $form['submit'] = [
             '#type' => 'submit',
-            '#value' => $this->t('Submit'),
+            '#value' => $this->t('Import'),
         ];
 
         return $form;
@@ -99,7 +111,20 @@ class ImporterForm extends FormBase {
      * {@inheritdoc}
      */
     public function validateForm(array &$form, FormStateInterface $form_state) {
+        // WD-TODO: improve validations
         parent::validateForm($form, $form_state);
+        $sourcePath = $form_state->getValue('source_path');
+        $destinationPath = $form_state->getValue('destination_path');
+        if($this->validateFilePath($sourcePath)){
+            $form_state->setErrorByName('source_path', "Do not include preceding or trailing slashes.");
+        }
+        if($this->validateFilePath($destinationPath)){
+            $form_state->setErrorByName('destination_path', "Do not include preceding or trailing slashes.");
+        }
+    }
+
+    public function validateFilePath($path){
+        return substr( $path, 0, 1 ) === "/" || substr($path, -1) === '/';
     }
 
     /**
@@ -108,16 +133,18 @@ class ImporterForm extends FormBase {
     public function submitForm(array &$form, FormStateInterface $form_state) {
         $trigger = (string) $form_state->getTriggeringElement()['#value'];
         switch ($trigger) {
-            case 'Submit':
+            case 'Import':
                 $entityType = $form_state->getValue('entity_type');
                 $entityBundle = $form_state->getValue('entity_bundle');
+                $sourcePath = $form_state->getValue('source_path');
+                $destinationPath = $form_state->getValue('destination_path');
                 $file = $form_state->getValue('csv');
                 $csv = \Drupal::entityTypeManager()->getStorage('file')->load($file[0]);
                 $csv_uri = $csv->getFileUri();
 
                 $batch = [
                     'operations' => [
-                        ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $entityType, $entityBundle]]
+                        ['\Drupal\wd_entity_importer\ImportEntities::import', [$csv_uri, $entityType, $entityBundle, $sourcePath, $destinationPath]]
                     ],
                     'finished' => '\Drupal\wd_entity_importer\ImportEntities::importFinish',
                     'title' => $this->t('Importing nodes...'),

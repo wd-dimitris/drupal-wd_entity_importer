@@ -2,19 +2,23 @@
 
 namespace Drupal\wd_entity_importer;
 
+use Drupal;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\media\Entity\Media;
 
 class ImportEntities{
 
-    public function __construct(){
-    }
+    public static function import($csv_uri, $entityType, $entityBundle, $sourcePath, $destinationPath, &$context){
 
-    public static function import($csv_uri, $entityType, $entityBundle, &$context){
+        if(empty($destinationPath)){
+            $dt = new Drupal\Core\Datetime\DrupalDateTime();
+            $destinationPath = $dt->format('Y-m').'-imported';
+        }
 
-        $user = \Drupal::currentUser();
+        $user = Drupal::currentUser();
         $uid = $user->id();
 
-        $defaultLanguage = \Drupal::languageManager()->getCurrentLanguage()->getId();
+        $defaultLanguage = Drupal::languageManager()->getCurrentLanguage()->getId();
 
         if (!isset($context['sandbox']['offset'])) {
             $context['sandbox']['offset'] = 0;
@@ -25,7 +29,7 @@ class ImportEntities{
 
         if ( $file_handle === FALSE ) {
             // Failed to open file
-            \Drupal::logger('csvImporter')->error('Failed to open '.$csv_uri);
+            Drupal::logger('csvImporter')->error('Failed to open '.$csv_uri);
             $context['finished'] = TRUE;
             return;
         }
@@ -34,7 +38,7 @@ class ImportEntities{
 
         if ( $ret != 0 ) {
             // Failed to seek
-            \Drupal::logger('csvImporter')->error('Failed to seek to '.$context['sandbox']['offset']);
+            Drupal::logger('csvImporter')->error('Failed to seek to '.$context['sandbox']['offset']);
             $context['finished'] = TRUE;
             return;
         }
@@ -64,14 +68,14 @@ class ImportEntities{
                 // Do something with the data
 
                 // Create first entity for default language
-                $entity = \Drupal::entityTypeManager()
+                $entity = Drupal::entityTypeManager()
                     ->getStorage($entityType)
                     ->create([
                         'type' => $entityBundle,
                         'langcode' => $defaultLanguage,
                         'uid' => $uid,
-                        'created' => \Drupal::time()->getRequestTime(),
-                        'changed' => \Drupal::time()->getRequestTime(),
+                        'created' => Drupal::time()->getRequestTime(),
+                        'changed' => Drupal::time()->getRequestTime(),
                     ]);
 
                 // Get first row field info
@@ -215,34 +219,44 @@ class ImportEntities{
                             case 'media_image':
                                 // WD-TODO: catch file not existing exceptions ans stuff
                                 // WD-TODO: destination is hardcoded, the module does not create directories
-                                $uri = \Drupal::service('file_system')->copy('public://wd_entity_importer/images/'.$fieldData['value'], 'public://uploads/'.$fieldData['value']);
-                                $file = \Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
-                                $file->save();
-                                $mediaImageAlt = trim($fieldData['alt']['value']);
-                                /** @var Media $mediaImage */
-                                $mediaImage = \Drupal::entityTypeManager()
-                                    ->getStorage('media')
-                                    ->create([
-                                        'bundle' => 'image',
-                                        'uid' => $uid,
-                                        'langcode' => $defaultLanguage,
-                                        'field_media_image' => [
-                                            'target_id' => $file->id(),
-                                            'alt' => $mediaImageAlt,
-                                        ],
-                                        'thumbnail' => [
-                                            'target_id' => $file->id(),
-                                            'alt' => $mediaImageAlt,
-                                        ]
-                                    ]);
-                                $mediaImage->setName($fieldValue);
-                                $mediaImage->save();
-                                $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
+                                $source = 'public://'.$sourcePath;
+                                $sourceFile = $source.'/'.$fieldData['value'];
+                                $destination = 'public://'.$destinationPath;
+                                $destinationFile = $destination.'/'.$fieldData['value'];
+                                if(Drupal::service('file_system')->prepareDirectory($destination, FileSystemInterface::CREATE_DIRECTORY)){
+                                    $uri = Drupal::service('file_system')->copy($sourceFile, $destinationFile);
+                                    $file = Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
+                                    $file->save();
+                                    $mediaImageAlt = trim($fieldData['alt']['value']);
+                                    /** @var Media $mediaImage */
+                                    $mediaImage = Drupal::entityTypeManager()
+                                        ->getStorage('media')
+                                        ->create([
+                                            'bundle' => 'image',
+                                            'uid' => $uid,
+                                            'langcode' => $defaultLanguage,
+                                            'field_media_image' => [
+                                                'target_id' => $file->id(),
+                                                'alt' => $mediaImageAlt,
+                                            ],
+                                            'thumbnail' => [
+                                                'target_id' => $file->id(),
+                                                'alt' => $mediaImageAlt,
+                                            ]
+                                        ]);
+                                    $mediaImage->setName($fieldValue);
+                                    $mediaImage->save();
+                                    $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
+                                }
+                                else{
+                                    Drupal::messenger()->addError('Destination directory does not exist or it is not writable');
+                                    return;
+                                }
                                 break;
                             case 'taxonomy_term':
                                 foreach($fieldValues as $v){
                                     // Get term by name, given the vid
-                                    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
+                                    $terms = Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
                                         'vid' => trim($fieldData['vid']),
                                         'name' => $v,
                                     ]);
@@ -260,7 +274,7 @@ class ImportEntities{
                             case 'taxonomy_term_auto_create':
                                 foreach($fieldValues as $v){
                                     // Get term by name, given the vid
-                                    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
+                                    $terms = Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties([
                                         'vid' => trim($fieldData['vid']),
                                         'name' => $v,
                                     ]);
@@ -274,7 +288,7 @@ class ImportEntities{
                                         }
                                     }
                                     else{ // if the term does not exist, create it
-                                        $termEntity = \Drupal::entityTypeManager()
+                                        $termEntity = Drupal::entityTypeManager()
                                             ->getStorage('taxonomy_term')
                                             ->create([
                                                 'name' => $v,
@@ -339,13 +353,13 @@ class ImportEntities{
 
     public static function importFinish($success, $results, $operations){
         if ($success) {
-            \Drupal::messenger()->addMessage('Import completed.');
+            Drupal::messenger()->addMessage('Import completed.');
         }
         else {
-            \Drupal::messenger()->addError('An error occurred and processing did not complete.');
+            Drupal::messenger()->addError('An error occurred and processing did not complete.');
             $count = count($results);
             $message = "$count items unsuccessfully processed";
-            \Drupal::messenger()->addMessage($message);
+            Drupal::messenger()->addMessage($message);
         }
     }
 }

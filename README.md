@@ -101,7 +101,7 @@ At the moment the module supports the following types of fields:
 
 ### Media Image Field
 
-Upload all images to `/sites/default/files/wd_entity_importer/images` before import.
+Upload all images to the specified path before import.
 
 `Header:` media|media_bundle|filed_name  
 `Value:` image file name
