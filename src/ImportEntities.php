@@ -3,6 +3,7 @@
 namespace Drupal\wd_entity_importer;
 
 use Drupal;
+use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\media\Entity\Media;
 
@@ -11,7 +12,7 @@ class ImportEntities{
     public static function import($csv_uri, $entityType, $entityBundle, $sourcePath, $destinationPath, &$context){
 
         if(empty($destinationPath)){
-            $dt = new Drupal\Core\Datetime\DrupalDateTime();
+            $dt = new DrupalDateTime();
             $destinationPath = $dt->format('Y-m').'-imported';
         }
 
@@ -48,8 +49,7 @@ class ImportEntities{
 
         $firstRow = TRUE;
 
-        // Get default language
-        $languages[$defaultLanguage] = $defaultLanguage;
+        $languages = [];
 
         $fields = [];
         $fieldsMap = [];
@@ -65,18 +65,6 @@ class ImportEntities{
                 $context['sandbox']['records']++;
                 $context['sandbox']['offset'] = ftell($file_handle);
                 $context['sandbox']['records'];
-                // Do something with the data
-
-                // Create first entity for default language
-                $entity = Drupal::entityTypeManager()
-                    ->getStorage($entityType)
-                    ->create([
-                        'type' => $entityBundle,
-                        'langcode' => $defaultLanguage,
-                        'uid' => $uid,
-                        'created' => Drupal::time()->getRequestTime(),
-                        'changed' => Drupal::time()->getRequestTime(),
-                    ]);
 
                 // Get first row field info
                 if($firstRow){
@@ -104,6 +92,17 @@ class ImportEntities{
                                     $fieldsMap[$key]['type'] = 'text_formatted';
                                     $fieldsMap[$key]['format'] = $fieldList[1];
                                     break;
+                                case 'text_formatted_summary': // ['text_formatted', 'body']
+                                    $fieldsMap[$key]['field'] = $fieldList[1];
+                                    $fieldsMap[$key]['type'] = 'text_formatted_summary';
+                                    break;
+                                case 'entity_reference': // ['entity_reference', 'field_country']
+                                    $fields[ $fieldList[1]]['name'] =  $fieldList[1];
+                                    $fields[ $fieldList[1]]['type'] = 'entity_reference';
+                                    $fields[ $fieldList[1]]['value'] = '';
+                                    $fieldsMap[$key]['field'] = $fieldList[1];
+                                    $fieldsMap[$key]['type'] = 'entity_reference';
+                                    break;
                                 // WD-TODO: support all media types
                                 // WD-TODO: support custom media image field
                                 // WD-TODO: support multi value media field
@@ -117,13 +116,13 @@ class ImportEntities{
                                         $fieldsMap[$key]['type'] = 'media_image_uri';
                                     }
                                     break;
-                                    // Media image alt
+                                // Media image alt
                                 case 'alt': // ['alt', 'field_media_image']
                                     $fields[$fieldList[1]]['alt']['value'] = '';
                                     $fieldsMap[$key]['field'] = $fieldList[1];
                                     $fieldsMap[$key]['type'] = 'media_image_alt';
                                     break;
-                                    // Taxonomy term
+                                // Taxonomy term
                                 case 'term': // ['term', 'vocabulary id', 'field_name']
                                     $fields[$fieldList[2]]['vid'] = $fieldList[1];
                                     $fields[$fieldList[2]]['type'] = 'taxonomy_term';
@@ -138,6 +137,18 @@ class ImportEntities{
                                     $fieldsMap[$key]['field'] = $fieldList[2];
                                     $fieldsMap[$key]['type'] = 'taxonomy_term_auto_create';
                                     break;
+                                case 'datetime':
+                                    $fields[$fieldList[1]]['name'] = $fieldList[1];
+                                    $fields[$fieldList[1]]['type'] = 'datetime';
+                                    $fieldsMap[$key]['field'] = $fieldList[1];
+                                    $fieldsMap[$key]['type'] = 'datetime';
+                                    break;
+                                case 'meta': // ['meta', 'title'] || ['meta', 'description']
+                                    $type = 'meta_'.$fieldList[1];
+                                    $fields['meta']['type'] = 'meta';
+                                    $fieldsMap[$key]['field'] = $type;
+                                    $fieldsMap[$key]['type'] = $type;
+                                    break;
                                 case 'translation':
                                     // Regular field
                                     if ($fieldListCount == 3) { // ['translation', 'el', 'field_name']
@@ -145,10 +156,22 @@ class ImportEntities{
                                         $fieldsMap[$key]['field'] = $fieldList[2];
                                         $fieldsMap[$key]['type'] = 'translation_string';
                                         $fieldsMap[$key]['translation'] = $fieldList[1];
-                                        $languages[$fieldList[1]] = $fieldList[1];
                                     }
                                     // Special fields
                                     if ($fieldListCount > 3) {
+                                        // Body
+                                        if ($fieldList[2] == 'text_formatted'){ // ['translation', 'el', 'text_formatted', 'body']
+                                            $fields[$fieldList[3]]['translation'][$fieldList[1]]['value'] = '';
+                                            $fieldsMap[$key]['field'] = $fieldList[3];
+                                            $fieldsMap[$key]['type'] = 'translation_text_formatted';
+                                            $fieldsMap[$key]['translation'] = $fieldList[1];
+                                        }
+                                        if ($fieldList[2] == 'text_formatted_summary'){ // ['translation', 'el', 'text_formatted_summary', 'body']
+                                            $fields[$fieldList[3]]['translation'][$fieldList[1]]['value'] = '';
+                                            $fieldsMap[$key]['field'] = $fieldList[3];
+                                            $fieldsMap[$key]['type'] = 'translation_text_formatted_summary';
+                                            $fieldsMap[$key]['translation'] = $fieldList[1];
+                                        }
                                         // Media alt
                                         // WD-TODO: differentiate between regular image alt
                                         if ($fieldList[2] == 'alt') { // ['translation', 'el', 'alt', 'field_name']
@@ -156,7 +179,14 @@ class ImportEntities{
                                             $fieldsMap[$key]['field'] = $fieldList[3];
                                             $fieldsMap[$key]['type'] = 'translation_media_alt';
                                             $fieldsMap[$key]['translation'] = $fieldList[1];
-                                            $languages[$fieldList[1]] = $fieldList[1];
+                                        }
+                                        // Meta tags
+                                        if ($fieldList[2] == 'meta'){ // ['translation', 'el', 'meta', 'title'] || ['translation', 'el', 'meta', 'description']
+                                            $type = 'translation_meta_'.$fieldList[3];
+                                            $fields['meta']['translation'][$fieldList[1]][$fieldList[3]] = '';
+                                            $fieldsMap[$key]['field'] = $type;
+                                            $fieldsMap[$key]['type'] = $type;
+                                            $fieldsMap[$key]['translation'] = $fieldList[1];
                                         }
                                     }
                                     break;
@@ -179,6 +209,12 @@ class ImportEntities{
                             $fields[$fieldName]['value'] = $fieldData;
                             $fields[$fieldName]['format'] = $fieldsMap[$key]['format'];
                             break;
+                        case 'text_formatted_summary':
+                            $fields[$fieldName]['summary'] = $fieldData;
+                            break;
+                        case 'entity_reference':
+                            $fields[$fieldName]['value'] = $fieldData;
+                            break;
                         case 'media_image_uri':
                             $fields[$fieldName]['value'] = $fieldData;
                             break;
@@ -191,66 +227,210 @@ class ImportEntities{
                         case 'taxonomy_term_auto_create':
                             $fields[$fieldName]['value'] = $fieldData;
                             break;
+                        case 'datetime':
+                            $fields[$fieldName]['value'] = $fieldData;
+                            break;
+                        case 'meta_title':
+                            $fields['meta']['title'] = $fieldData;
+                            break;
+                        case 'meta_description':
+                            $fields['meta']['description'] = $fieldData;
+                            break;
                         case 'translation_string':
                             $lang = $fieldsMap[$key]['translation'];
                             $fields[$fieldName]['translation'][$lang]['value'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
+                            break;
+                        case 'translation_text_formatted':
+                            $lang = $fieldsMap[$key]['translation'];
+                            $fields[$fieldName]['translation'][$lang]['value'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
+                            break;
+                        case 'translation_text_formatted_summary':
+                            $lang = $fieldsMap[$key]['translation'];
+                            $fields[$fieldName]['translation'][$lang]['summary'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
                             break;
                         case 'translation_media_alt':
                             $lang = $fieldsMap[$key]['translation'];
                             $fields[$fieldName]['translation'][$lang]['alt']['value'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
+                            break;
+                        case 'translation_meta_title':
+                            $lang = $fieldsMap[$key]['translation'];
+                            $fields['meta']['translation'][$lang]['title'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
+                            break;
+                        case 'translation_meta_description':
+                            $lang = $fieldsMap[$key]['translation'];
+                            $fields['meta']['translation'][$lang]['description'] = $fieldData;
+                            if($fieldData){
+                                $languages[$lang] = $lang;
+                            }
                             break;
                     }
                 }
 
+                // set default language
+                if(isset($fields['language_code']['value'])){
+                    $entityLanguage = $fields['language_code']['value'];
+                }
+                else{
+                    $entityLanguage = $defaultLanguage;
+                }
+
+
+                // Create first entity for default language
+                /** @var Drupal\Core\Entity\ContentEntityBase $entity */
+                $entity = Drupal::entityTypeManager()
+                    ->getStorage($entityType)
+                    ->create([
+                        'type' => $entityBundle,
+                        'langcode' => $entityLanguage,
+                        'uid' => $uid,
+                        'created' =>  Drupal::time()->getRequestTime(),
+                        'changed' =>  Drupal::time()->getRequestTime(),
+                    ]);
                 // Set row data to entity
                 foreach($fields as $fieldName => $fieldData){
-                    $fieldValue = trim($fieldData['value']);
-                    $fieldValues = explode('|', $fieldValue);
+                    $fieldValue = isset($fieldData['value']) ? trim($fieldData['value']) : '';
+                    $fieldValues = explode(',', $fieldValue);
                     $isMultiValue = is_array($fieldValues);
                     $fieldType = $fieldData['type'];
-                    if($entity->hasField($fieldName)){
+                    if($fieldType == 'meta' || $entity->hasField($fieldName)){
                         switch($fieldType){
                             case 'string':
-                                $entity->set($fieldName, $fieldValue);
+                                switch($fieldName){
+                                    case 'path':
+                                        $entity->set($fieldName, ['alias' => $fieldValue]);
+                                        break;
+                                    case 'post_data':
+                                        break;
+                                    default:
+                                        $entity->set($fieldName, $fieldValue);
+                                        break;
+                                }
                                 break;
                             case 'text_formatted':
-                                $entity->set($fieldName,['value' => $fieldValue, 'format' => $fieldData['format']]);
+                                $arr = [];
+                                $arr = ['value' => $fieldValue, 'format' => $fieldData['format']];
+                                if(isset($fieldData['summary'])){
+                                    $arr['summary'] = $fieldData['summary'];
+                                }
+                                $entity->set($fieldName, $arr);
+                                break;
+                            case 'entity_reference':
+                                $entity->set($fieldName, ['target_id' => $fieldValue]);
                                 break;
                             case 'media_image':
                                 // WD-TODO: catch file not existing exceptions ans stuff
                                 // WD-TODO: destination is hardcoded, the module does not create directories
-                                $source = 'public://'.$sourcePath;
-                                $sourceFile = $source.'/'.$fieldData['value'];
-                                $destination = 'public://'.$destinationPath;
-                                $destinationFile = $destination.'/'.$fieldData['value'];
-                                if(Drupal::service('file_system')->prepareDirectory($destination, FileSystemInterface::CREATE_DIRECTORY)){
-                                    $uri = Drupal::service('file_system')->copy($sourceFile, $destinationFile);
-                                    $file = Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
-                                    $file->save();
-                                    $mediaImageAlt = trim($fieldData['alt']['value']);
-                                    /** @var Media $mediaImage */
-                                    $mediaImage = Drupal::entityTypeManager()
-                                        ->getStorage('media')
-                                        ->create([
-                                            'bundle' => 'image',
-                                            'uid' => $uid,
-                                            'langcode' => $defaultLanguage,
-                                            'field_media_image' => [
-                                                'target_id' => $file->id(),
-                                                'alt' => $mediaImageAlt,
-                                            ],
-                                            'thumbnail' => [
-                                                'target_id' => $file->id(),
-                                                'alt' => $mediaImageAlt,
-                                            ]
-                                        ]);
-                                    $mediaImage->setName($fieldValue);
-                                    $mediaImage->save();
-                                    $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
+
+                                try {
+
+                                    $hasMultipleImages = strpos($fieldData['value'], ',');
+
+                                    if (!$hasMultipleImages && $fieldData['value']) {
+                                        $source = 'public://' . $sourcePath;
+                                        $sourceFile = $source . '/' . $fieldData['value'];
+                                        $destination = 'public://' . $destinationPath;
+                                        $destinationFile = $destination . '/' . $fieldData['value'];
+                                        if (Drupal::service('file_system')->prepareDirectory($destination, FileSystemInterface::CREATE_DIRECTORY)) {
+                                            $uri = Drupal::service('file_system')->copy($sourceFile, $destinationFile);
+                                            $file = Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
+                                            $file->save();
+                                            $mediaImageAlt = trim($fieldData['alt']['value']);
+                                            /** @var Media $mediaImage */
+                                            $mediaImage = Drupal::entityTypeManager()
+                                                ->getStorage('media')
+                                                ->create([
+                                                    'bundle' => 'image',
+                                                    'uid' => $uid,
+                                                    'langcode' => $defaultLanguage,
+                                                    'field_media_image' => [
+                                                        'target_id' => $file->id(),
+                                                        'alt' => $mediaImageAlt,
+                                                    ],
+                                                    'thumbnail' => [
+                                                        'target_id' => $file->id(),
+                                                        'alt' => $mediaImageAlt,
+                                                    ]
+                                                ]);
+                                            $mediaImage->setName($fieldValue);
+                                            $mediaImage->save();
+                                            $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
+                                        } else {
+                                            Drupal::messenger()->addError('Destination directory does not exist or it is not writable');
+                                        }
+                                    } else {
+                                        $images = explode(',', $fieldData['value']);
+                                        $first = true;
+                                        foreach ($images as $image) {
+                                            if (!$image) {
+                                                continue;
+                                            }
+                                            $source = 'public://' . $sourcePath;
+                                            $sourceFile = $source . '/' . $image;
+                                            $destination = 'public://' . $destinationPath;
+                                            $destinationFile = $destination . '/' . $image;
+                                            if (Drupal::service('file_system')->prepareDirectory($destination, FileSystemInterface::CREATE_DIRECTORY)) {
+                                                try {
+                                                    $uri = Drupal::service('file_system')->copy($sourceFile, $destinationFile);
+                                                    $file = Drupal::entityTypeManager()->getStorage('file')->create(['uri' => $uri]);
+                                                    $file->save();
+                                                    // WD-TODO: multiple atl
+                                                    // $mediaImageAlt = trim($fieldData['alt']['value']);
+                                                    /** @var Media $mediaImage */
+                                                    $mediaImage = Drupal::entityTypeManager()
+                                                        ->getStorage('media')
+                                                        ->create([
+                                                            'bundle' => 'image',
+                                                            'uid' => $uid,
+                                                            'langcode' => $defaultLanguage,
+                                                            'field_media_image' => [
+                                                                'target_id' => $file->id(),
+                                                                'alt' => '',
+                                                            ],
+                                                            'thumbnail' => [
+                                                                'target_id' => $file->id(),
+                                                                'alt' => '',
+                                                            ]
+                                                        ]);
+                                                    $mediaImage->setName($image);
+                                                    $mediaImage->save();
+                                                } catch (\Throwable $e) {
+                                                    Drupal::messenger()->addError($e->getMessage());
+                                                }
+                                                if (isset($mediaImage) && $mediaImage) {
+                                                    try {
+                                                        if ($first) {
+                                                            $entity->set($fieldName, ['target_id' => $mediaImage->id()]);
+                                                            $first = false;
+                                                        } else {
+                                                            $entity->get($fieldName)->appendItem(['target_id' => $mediaImage->id()]);
+                                                        }
+                                                    } catch (\Throwable $e) {
+                                                        Drupal::messenger()->addError($e->getMessage());
+                                                    }
+                                                }
+                                            } else {
+                                                Drupal::messenger()->addError('Destination directory does not exist or it is not writable');
+                                            }
+                                        }
+                                    }
                                 }
-                                else{
-                                    Drupal::messenger()->addError('Destination directory does not exist or it is not writable');
-                                    return;
+                                catch (\Throwable $e){
+                                    Drupal::messenger()->addError($e->getMessage());
                                 }
                                 break;
                             case 'taxonomy_term':
@@ -305,21 +485,40 @@ class ImportEntities{
 
                                 }
                                 break;
-
+                            case 'datetime':
+                                $dt = new DrupalDateTime($fieldValue);
+                                $dt->setTimezone(new \DateTimeZone('UTC'));
+                                $entity->set($fieldName, $dt->format('Y-m-d\TH:i:s'));
+                                break;
+                            case 'meta':
+                                $arr = [];
+                                $arr['title'] = $fieldData['title'];
+                                $arr['description'] = $fieldData['description'];
+                                $entity->set('field_meta_tags', serialize($arr));
                         }
                     }
                 }
-                $entity->save();
+                try {
+                    $entity->save();
+                }
+                catch (\Throwable $e){
+                    Drupal::messenger()->addError($entity->get('title')->getString().', save entity => '.$e->getMessage());
+                    continue;
+                }
                 // Check for translations
-                if(count($languages) > 1){
-                    $skipDefaultLanguage = TRUE;
+                if(!empty($languages)){
                     foreach($languages as $lang){
-                        if($skipDefaultLanguage){
-                            $skipDefaultLanguage = FALSE;
+                        if($lang == $entityLanguage){
                             continue;
                         }
                         $entity->addTranslation($lang, $entity->toArray());
-                        $entity->save();
+                        try {
+                            $entity->save();
+                        }
+                        catch (\Throwable $e){
+                            Drupal::messenger()->addError($entity->get('title')->getValue().', get translation => '.$e->getMessage());
+                            continue;
+                        }
                         $translatedEntity = $entity->getTranslation($lang);
                         foreach($fields as $fname => $d){
                             if(isset($d['translation'])){
@@ -328,6 +527,14 @@ class ImportEntities{
                                     case 'string':
                                         $translatedEntity->set($fname, $translatedValue);
                                         break;
+                                    case 'text_formatted':
+                                        $arr = [];
+                                        $arr = ['value' => $translatedValue, 'format' => $d['format']];
+                                        if(isset($d['summary'])){
+                                            $arr['summary'] = $d['translation'][$lang]['summary'];
+                                        }
+                                        $translatedEntity->set($fname, $arr);
+                                        break;
                                     case 'media_image':
                                         $translatedMediaImageAlt = trim($d['translation'][$lang]['alt']['value']);
                                         $mediaImageValues = $mediaImage->toArray();
@@ -335,10 +542,25 @@ class ImportEntities{
                                         $mediaImage->addTranslation('el', $mediaImageValues);
                                         $mediaImage->save();
                                         break;
+                                    case 'meta':
+                                        $arr = [];
+                                        $arr['title'] = $d['translation'][$lang]['title'];
+                                        $arr['description'] = $d['translation'][$lang]['description'];
+                                        $translatedEntity->set('field_meta_tags', serialize($arr));
                                 }
                             }
                         }
-                        $translatedEntity->save();
+                        try {
+                            // check if empty title
+                            if(!$translatedEntity->get('title')->getString()){
+                                $translatedEntity->set('title', $entity->get('title')->getString());
+                            }
+                            $translatedEntity->save();
+                        }
+                        catch (\Throwable $e){
+                            Drupal::messenger()->addError($entity->get('title')->getString().', save translation => '.$e->getMessage());
+                            continue;
+                        }
                     }
                 }
             }
